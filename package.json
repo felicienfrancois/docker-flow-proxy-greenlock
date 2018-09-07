@@ -1,0 +1,14 @@
+{
+  "name": "docker-greenlock",
+  "main": "server.js",
+  "dependencies": {
+    "async": "^2.6.1",
+    "dockerode": "^2.5.6",
+    "greenlock": "^2.4.2",
+    "le-challenge-standalone": "^2.1.0",
+    "le-store-certbot": "^2.2.0"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
