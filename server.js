@@ -109,8 +109,8 @@ function pollDockerServices() {
 					};
 					domains[domainsLabel] = domain;
 					certificatesQueue.push(domain);
-				} else if (currentDomains.indexOf(domainsLabel) !== -1){
-					removedDomains.splice(currentDomains.indexOf(domainsLabel), 1);
+				} else if (removedDomains.indexOf(domainsLabel) !== -1){
+					removedDomains.splice(removedDomains.indexOf(domainsLabel), 1);
 				}
 			});
 			removedDomains.forEach(function(removedDomain) {
