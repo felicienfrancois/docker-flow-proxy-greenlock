@@ -19,7 +19,7 @@ var greenlockStaging = Greenlock.create({
 	version: 'draft-12',
 	server: 'https://acme-staging-v02.api.letsencrypt.org/directory',
 	configDir: '/acme/staging/config',
-	store: LeStore.create({
+	store: LeStoreCertbot.create({
 		configDir: '/acme/staging/certs',
 		debug: false
 	}),
@@ -35,7 +35,7 @@ var greenlockProduction = Greenlock.create({
 	version: 'draft-12',
 	server: 'https://acme-v02.api.letsencrypt.org/directory',
 	configDir: '/acme/live/config',
-	store: LeStore.create({
+	store: LeStoreCertbot.create({
 		configDir: '/acme/live/certs',
 		debug: false
 	}),
@@ -88,6 +88,10 @@ function pollDockerServices() {
 	try {
 		console.log("Polling docker labels ...");
 		docker.listServices({"label": "com.df.letsencrypt.host"}, function (err, services) {
+			if (err || !services) {
+				console.error("Failed to get Docker service list", err);
+				return;
+			}
 			var removedDomains = Object.keys(domains).slice(0);
 			services.forEach(function(service) {
 				var domainsLabel = service["Spec"]["Labels"]["com.df.letsencrypt.host"];
