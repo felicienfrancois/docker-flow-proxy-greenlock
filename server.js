@@ -7,7 +7,12 @@ const Greenlock = require('greenlock');
 const LeStoreCertbot = require('le-store-certbot');
 const LeChallengeStandalone = require('le-challenge-standalone');
 
+const config = {
+	
+};
+
 const docker = new Docker();
+
 
 const domains = {};
 
@@ -102,7 +107,7 @@ function pollDockerServices() {
 						email: service["Spec"]["Labels"]["com.df.letsencrypt.email"]
 					};
 					domains[domainsLabel] = domain;
-					getCertQueue.push(domain);
+					certificatesQueue.push(domain);
 				} else if (currentDomains.indexOf(domainsLabel) !== -1){
 					removedDomains.splice(currentDomains.indexOf(domainsLabel), 1);
 				}
