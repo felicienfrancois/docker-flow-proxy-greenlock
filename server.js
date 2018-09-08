@@ -92,7 +92,7 @@ function getCertificate(domains, email, callback) {
 function pollDockerServices() {
 	try {
 		console.log("Polling docker labels ...");
-		docker.listServices({"label": "com.df.letsencrypt.host"}, function (err, services) {
+		docker.listServices({"filters": "label=com.df.letsencrypt.host"}, function (err, services) {
 			if (err || !services) {
 				console.error("Failed to get Docker service list", err);
 				return;
@@ -100,6 +100,7 @@ function pollDockerServices() {
 			var removedDomains = Object.keys(domains).slice(0);
 			services.forEach(function(service) {
 				var domainsLabel = service["Spec"]["Labels"]["com.df.letsencrypt.host"];
+				if (!domainsLabel) return;
 				console.log("Adding new certificate to queue "+domainsLabel);
 				if (!domains[domainsLabel]) {
 					var domain = {
