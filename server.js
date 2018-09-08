@@ -92,7 +92,7 @@ function getCertificate(domains, email, callback) {
 function pollDockerServices() {
 	try {
 		console.log("Polling docker labels ...");
-		docker.listServices({"filters": "label=com.df.letsencrypt.host"}, function (err, services) {
+		docker.listServices({"filters": JSON.stringify({"label": "com.df.letsencrypt.host"})}, function (err, services) {
 			if (err || !services) {
 				console.error("Failed to get Docker service list", err);
 				return;
