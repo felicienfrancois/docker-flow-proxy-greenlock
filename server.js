@@ -105,6 +105,7 @@ function pollDockerServices() {
 			});
 			removedDomains.forEach(function(removedDomain) {
 				console.log("Removing certificate from managed list "+domainsLabel);
+				certificatesQueue.remove(domains[removedDomain]);
 				delete domains[removedDomain];
 			});
 		});
@@ -136,12 +137,13 @@ const webhooksQueue = async.queue(function(cert, callback) {
 		  path: "/v1/docker-flow-proxy/cert?certName="+cert.subject+".pem&distribute=true",
 		  method: "PUT"
 	}, function(res) {
-		  console.log('STATUS: ' + res.statusCode);
-		  console.log('HEADERS: ' + JSON.stringify(res.headers));
-		  res.setEncoding('utf8');
-		  res.on('data', function (chunk) {
-		    console.log('BODY: ' + chunk);
-		  });
+		// TODO: Handle retry on failure
+		console.log('Webhook Status: ' + res.statusCode);
+		res.setEncoding('utf8');
+		res.on('data', function (chunk) {
+			console.log('Webhook response: ' + chunk);
+		});
+		callback();
 	});
 	req.write(cert.privkey + '\n');
 	req.write(cert.cert + '\n');
