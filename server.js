@@ -13,8 +13,7 @@ const config = {
 
 const docker = new Docker();
 
-
-const domains = {};
+const domainsCache = {};
 
 const leHttpChallenge = require('le-challenge-standalone').create({
 	debug: false
@@ -97,17 +96,17 @@ function pollDockerServices() {
 				console.error("Failed to get Docker service list", err);
 				return;
 			}
-			var removedDomains = Object.keys(domains).slice(0);
+			var removedDomains = Object.keys(domainsCache).slice(0);
 			services.forEach(function(service) {
 				var domainsLabel = service["Spec"]["Labels"]["com.df.letsencrypt.host"];
 				if (!domainsLabel) return;
 				console.log("Adding new certificate to queue "+domainsLabel);
-				if (!domains[domainsLabel]) {
+				if (!domainsCache[domainsLabel]) {
 					var domain = {
 						domains: domainsLabel.split(/[,;]/),
 						email: service["Spec"]["Labels"]["com.df.letsencrypt.email"]
 					};
-					domains[domainsLabel] = domain;
+					domainsCache[domainsLabel] = domain;
 					certificatesQueue.push(domain);
 				} else if (removedDomains.indexOf(domainsLabel) !== -1){
 					removedDomains.splice(removedDomains.indexOf(domainsLabel), 1);
@@ -115,15 +114,15 @@ function pollDockerServices() {
 			});
 			removedDomains.forEach(function(removedDomain) {
 				console.log("Removing certificate from managed list "+domainsLabel);
-				certificatesQueue.remove(domains[removedDomain]);
-				delete domains[removedDomain];
+				certificatesQueue.remove(domainsCache[removedDomain]);
+				delete domainsCache[removedDomain];
 			});
 		});
 	} catch(err) {
 		console.error("An unexpected error occured", err);
 	}
-	// Poll every 30s
-	setTimeout(pollDockerServices, 30000);
+	// Poll every 60s
+	setTimeout(pollDockerServices, 60000);
 }
 
 const certificatesQueue = async.queue(function(task, callback) {
