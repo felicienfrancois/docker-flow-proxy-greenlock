@@ -82,7 +82,7 @@ function getCertificate(domains, email, callback) {
 				callback(err);
 			});
 		}, function (err) {
-			console.error("Failed to get production certificate for domains "+domains.join(",")+" ...", err, err && err.stack);
+			console.error("Failed to get staging certificate for domains "+domains.join(",")+" ...", err, err && err.stack);
 			callback(err);
 		});
 	})
