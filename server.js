@@ -162,7 +162,7 @@ var prefix = '/.well-known/acme-challenge/';
 
 http.createServer(function(req, resp) {
 	console.log("[Server] "+req.method + " " + req.url);
-	if (req.url.indexOf(prefix) !== 0) {
+	if (req.url.indexOf(prefix) === 0) {
 		var token = req.url.slice(prefix.length);
 		var hostname = req.hostname || (req.headers.host || '').toLowerCase().replace(/:.*/, '');
 		greenlockStaging.challenges['http-01'].get(Object.assign({domains: [hostname]}, greenlockStaging), hostname, token, function (err, secret) {
@@ -193,6 +193,10 @@ http.createServer(function(req, resp) {
     			res.end(secret);
     		});
 		});
+	} else {
+		res.statusCode = 404;
+		res.setHeader('Content-Type', 'application/json; charset=utf-8');
+		res.end('{ "error": { "message": "Not found" } }');
 	}
 }).listen(80);
 console.log("Starting docker service polling");
