@@ -128,10 +128,10 @@ function pollDockerServices() {
 const certificatesQueue = async.queue(function(task, callback) {
 	getCertificate(task.domains, task.email, function(err, cert) {
 		if (err) {
-			task.retryCount = (tasks.retryCount || 0) + 1;
+			task.retryCount = (task.retryCount || 0) + 1;
 			setTimeout(function() {
 				certificatesQueue.push(task);
-			}, task.retryCount * 30000);
+			}, task.retryCount * 60000);
 		} else {
 			webhooksQueue.push(cert);
 		}
