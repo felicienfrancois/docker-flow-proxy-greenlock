@@ -168,35 +168,35 @@ http.createServer(function(req, resp) {
 		greenlockStaging.challenges['http-01'].get(Object.assign({domains: [hostname]}, greenlockStaging), hostname, token, function (err, secret) {
 	        if (err) {
 	        	console.error("Error while looking for staging secret", err);
-				res.statusCode = 404;
-				res.setHeader('Content-Type', 'application/json; charset=utf-8');
-				res.end('{ "error": { "message": "Error: These aren\'t the tokens you\'re looking for. Move along." } }');
+				resp.statusCode = 404;
+				resp.setHeader('Content-Type', 'application/json; charset=utf-8');
+				resp.end('{ "error": { "message": "Error: These aren\'t the tokens you\'re looking for. Move along." } }');
 				return;
 	        }
 	        if (secret) {
 	        	console.log("Found staging secret for "+hostname);
-				res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-				res.end(secret);
+				resp.setHeader('Content-Type', 'text/plain; charset=utf-8');
+				resp.end(secret);
 				return;
 	        }
         	greenlockProduction.challenges['http-01'].get(Object.assign({domains: [hostname]}, greenlockProduction), hostname, token, function (err, secret) {
     	        if (err || !secret) {
     	        	if (err) console.error("Error while looking for production secret", err);
     	        	else console.error("Secret not found for hostname " + hostname);
-    				res.statusCode = 404;
-    				res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    				res.end('{ "error": { "message": "Error: These aren\'t the tokens you\'re looking for. Move along." } }');
+    				resp.statusCode = 404;
+    				resp.setHeader('Content-Type', 'application/json; charset=utf-8');
+    				resp.end('{ "error": { "message": "Error: These aren\'t the tokens you\'re looking for. Move along." } }');
     				return;
     	        }
 	        	console.log("Found production secret for "+hostname);
-    			res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    			res.end(secret);
+    			resp.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    			resp.end(secret);
     		});
 		});
 	} else {
-		res.statusCode = 404;
-		res.setHeader('Content-Type', 'application/json; charset=utf-8');
-		res.end('{ "error": { "message": "Not found" } }');
+		resp.statusCode = 404;
+		resp.setHeader('Content-Type', 'application/json; charset=utf-8');
+		resp.end('{ "error": { "message": "Not found" } }');
 	}
 }).listen(80);
 console.log("Starting docker service polling");
