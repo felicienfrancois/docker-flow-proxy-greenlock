@@ -96,15 +96,15 @@ function pollDockerServices() {
 			services.forEach(function(service) {
 				var domainsLabel = service["Spec"]["Labels"]["com.df.letsencrypt.host"];
 				if (!domainsLabel) return;
-				console.log("Adding new certificate to queue "+domainsLabel);
 				if (!domainsCache[domainsLabel]) {
+					console.log("Adding new certificate to queue "+domainsLabel);
 					var domain = {
 						domains: domainsLabel.split(/[,;]/),
 						email: service["Spec"]["Labels"]["com.df.letsencrypt.email"]
 					};
 					domainsCache[domainsLabel] = domain;
 					certificatesQueue.push(domain);
-				} else if (removedDomains.indexOf(domainsLabel) !== -1){
+				} else if (removedDomains.indexOf(domainsLabel) !== -1) {
 					removedDomains.splice(removedDomains.indexOf(domainsLabel), 1);
 				}
 			});
