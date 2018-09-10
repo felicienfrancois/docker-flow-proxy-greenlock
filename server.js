@@ -15,10 +15,6 @@ const docker = new Docker();
 
 const domainsCache = {};
 
-const leHttpChallenge = require('le-challenge-standalone').create({
-	debug: false
-});
-
 var greenlockStaging = Greenlock.create({
 	version: 'draft-12',
 	server: 'https://acme-staging-v02.api.letsencrypt.org/directory',
@@ -161,6 +157,43 @@ const webhooksQueue = async.queue(function(cert, callback) {
 }, 1);
 
 console.log("Starting letsencrypt server on port 80");
-http.createServer(greenlockStaging.middleware(greenlockProduction.middleware())).listen(80);
+
+var prefix = '/.well-known/acme-challenge/';
+
+http.createServer(function(req, resp) {
+	console.log("[Server] "+req.method + " " + req.url);
+	if (req.url.indexOf(prefix) !== 0) {
+		var token = req.url.slice(prefix.length);
+		var hostname = req.hostname || (req.headers.host || '').toLowerCase().replace(/:.*/, '');
+		greenlockStaging.challenges['http-01'].get(Object.assign({domains: [hostname]}, greenlockStaging), hostname, token, function (err, secret) {
+	        if (err) {
+	        	console.error("Error while looking for staging secret", err);
+				res.statusCode = 404;
+				res.setHeader('Content-Type', 'application/json; charset=utf-8');
+				res.end('{ "error": { "message": "Error: These aren\'t the tokens you\'re looking for. Move along." } }');
+				return;
+	        }
+	        if (secret) {
+	        	console.log("Found staging secret for "+hostname);
+				res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+				res.end(secret);
+				return;
+	        }
+        	greenlockProduction.challenges['http-01'].get(Object.assign({domains: [hostname]}, greenlockProduction), hostname, token, function (err, secret) {
+    	        if (err || !secret) {
+    	        	if (err) console.error("Error while looking for production secret", err);
+    	        	else console.error("Secret not found for hostname " + hostname);
+    				res.statusCode = 404;
+    				res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    				res.end('{ "error": { "message": "Error: These aren\'t the tokens you\'re looking for. Move along." } }');
+    				return;
+    	        }
+	        	console.log("Found production secret for "+hostname);
+    			res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    			res.end(secret);
+    		});
+		});
+	}
+}).listen(80);
 console.log("Starting docker service polling");
 pollDockerServices();
