@@ -2,13 +2,28 @@
 
 const async = require('async');
 const http = require('http');
+const path = require('path');
 const Docker = require('dockerode');
 const Greenlock = require('greenlock');
 const LeStoreCertbot = require('le-store-certbot');
 const LeChallengeStandalone = require('le-challenge-standalone');
 
 const config = {
-	
+	DEBUG: !!process.env.DEBUG,
+	STAGING_BASE_DIRECTORY: process.env.STAGING_BASE_DIRECTORY || "/acme/staging",
+	LIVE_BASE_DIRECTORY: process.env.LIVE_BASE_DIRECTORY || "/acme/live",
+	DISABLE_STAGING_PRECONTROL: !!process.env.DISABLE_STAGING_PRECONTROL,
+	RETRY_INTERVAL: Number(process.env.RETRY_INTERVAL || 60000),
+	MAX_RETRY: Number(process.env.MAX_RETRY || 10),
+	DISABLE_DOCKER_SERVICE_POLLING: !!process.env.DISABLE_DOCKER_SERVICE_POLLING,
+	DOCKER_POLLING_INTERVAL: Number(process.env.DOCKER_POLLING_INTERVAL || 60000),
+	DOCKER_LABEL_HOST: process.env.DOCKER_LABEL_HOST || "docker.greenlock.host",
+	DOCKER_LABEL_EMAIL: process.env.DOCKER_LABEL_EMAIL || "docker.greenlock.email",
+	WEBHOOKS_HOST: process.env.WEBHOOKS_HOST,
+	WEBHOOKS_PORT: Number(process.env.WEBHOOKS_PORT || 80),
+	WEBHOOKS_PATH: process.env.WEBHOOKS_PATH || "/",
+	WEBHOOKS_METHOD: process.env.WEBHOOKS_METHOD || "POST",
+	RSA_KEY_SIZE: Number(process.env.RSA_KEY_SIZE || 4096)
 };
 
 const docker = new Docker();
@@ -18,9 +33,9 @@ const domainsCache = {};
 var greenlockStaging = Greenlock.create({
 	version: 'draft-12',
 	server: 'https://acme-staging-v02.api.letsencrypt.org/directory',
-	configDir: '/acme/staging/config',
+	configDir:  path.resolve(config.STAGING_BASE_DIRECTORY, 'config'),
 	store: LeStoreCertbot.create({
-		configDir: '/acme/staging/certs',
+		configDir: path.resolve(config.STAGING_BASE_DIRECTORY, 'certs'),
 		debug: false
 	}),
 	challenges: {
@@ -34,9 +49,9 @@ var greenlockStaging = Greenlock.create({
 var greenlockProduction = Greenlock.create({
 	version: 'draft-12',
 	server: 'https://acme-v02.api.letsencrypt.org/directory',
-	configDir: '/acme/live/config',
+	configDir: path.resolve(config.LIVE_BASE_DIRECTORY, 'config'),
 	store: LeStoreCertbot.create({
-		configDir: '/acme/live/certs',
+		configDir: path.resolve(config.LIVE_BASE_DIRECTORY, 'certs'),
 		debug: false
 	}),
 	challenges: {
@@ -46,6 +61,22 @@ var greenlockProduction = Greenlock.create({
 	},
 	debug: false
 });
+
+function stagingPrecontrol(domains, email, callback) {
+	if (config.DISABLE_STAGING_PRECONTROL) return callback();
+	console.log("Trying to acquire staging certificate for domains "+domains.join(",")+" ...");
+	greenlockStaging.register({
+		domains: domains,
+		email: email,
+		agreeTos: true,
+		rsaKeySize: config.RSA_KEY_SIZE
+	}).then(function(certs) {
+		callback();
+	}, function (err) {
+		console.error("Failed to get staging certificate for domains "+domains.join(",")+" ...", err, err && err.stack);
+		callback(err);
+	});
+}
 
 function getCertificate(domains, email, callback) {
 	if (!domains || typeof(domains.length) === "undefined") {
@@ -57,19 +88,14 @@ function getCertificate(domains, email, callback) {
 			console.log("Found certificate in storage for domains "+domains.join(",")+" ...");
 		    return callback(null, results);
 		}
-		console.log("Trying to acquire staging certificate for domains "+domains.join(",")+" ...");
-		greenlockStaging.register({
-			domains: domains,
-			email: email,
-			agreeTos: true,
-			rsaKeySize: 4096
-		}).then(function(certs) {
+		stagingPrecontrol(domains, email, function(err) {
+			if (err) return callback(err);
 			console.log("Trying to acquire production certificate for domains "+domains.join(",")+" ...");
 			greenlockProduction.register({
 				domains: domains,
 				email: email,
 				agreeTos: true,
-				rsaKeySize: 4096
+				rsaKeySize: config.RSA_KEY_SIZE
 			}).then(function(certs) {
 				console.log("Successfully got certificate for domains "+domains.join(",")+" ...");
 				callback(null, certs);
@@ -77,30 +103,30 @@ function getCertificate(domains, email, callback) {
 				console.error("Failed to get production certificate for domains "+domains.join(",")+" ...", err, err && err.stack);
 				callback(err);
 			});
-		}, function (err) {
-			console.error("Failed to get staging certificate for domains "+domains.join(",")+" ...", err, err && err.stack);
-			callback(err);
 		});
-	})
+	}, function (err) {
+		console.error("Failed to check certificate for domains "+domains.join(",")+" ...", err, err && err.stack);
+		callback(err);
+	});
 }
 
 function pollDockerServices() {
 	try {
 		console.log("Polling docker labels ...");
-		docker.listServices({"filters": {"label": ["com.df.letsencrypt.host"]}}, function (err, services) {
+		docker.listServices({"filters": {"label": [config.DOCKER_LABEL_HOST]}}, function (err, services) {
 			if (err || !services) {
 				console.error("Failed to get Docker service list", err);
 				return;
 			}
 			var removedDomains = Object.keys(domainsCache).slice(0);
 			services.forEach(function(service) {
-				var domainsLabel = service["Spec"]["Labels"]["com.df.letsencrypt.host"];
+				var domainsLabel = service["Spec"]["Labels"][config.DOCKER_LABEL_HOST];
 				if (!domainsLabel) return;
 				if (!domainsCache[domainsLabel]) {
 					console.log("Adding new certificate to queue "+domainsLabel);
 					var domain = {
 						domains: domainsLabel.split(/[,;]/),
-						email: service["Spec"]["Labels"]["com.df.letsencrypt.email"]
+						email: service["Spec"]["Labels"][config.DOCKER_LABEL_EMAIL]
 					};
 					domainsCache[domainsLabel] = domain;
 					certificatesQueue.push(domain);
@@ -118,18 +144,23 @@ function pollDockerServices() {
 		console.error("An unexpected error occured", err);
 	}
 	// Poll every 60s
-	setTimeout(pollDockerServices, 60000);
+	setTimeout(pollDockerServices, config.DOCKER_POLLING_INTERVAL);
 }
 
 const certificatesQueue = async.queue(function(task, callback) {
 	getCertificate(task.domains, task.email, function(err, cert) {
 		if (err) {
 			task.retryCount = (task.retryCount || 0) + 1;
+			if (task.retryCount > config.MAX_RETRY) {
+				return console.error("Max retries reached for domains "+task.domains.join(","));
+			}
 			setTimeout(function() {
 				certificatesQueue.push(task);
-			}, task.retryCount * 60000);
+			}, task.retryCount * config.RETRY_INTERVAL);
 		} else {
-			webhooksQueue.push(cert);
+			if (config.WEBHOOKS_HOST) {
+				webhooksQueue.push(cert);
+			}
 		}
 		callback();
 	});
@@ -137,10 +168,10 @@ const certificatesQueue = async.queue(function(task, callback) {
 
 const webhooksQueue = async.queue(function(cert, callback) {
 	var req = http.request({
-		  host: "proxy_proxy",
-		  port: 8080,
-		  path: "/v1/docker-flow-proxy/cert?certName="+cert.subject+".pem&distribute=true",
-		  method: "PUT"
+		  host: config.WEBHOOKS_HOST,
+		  port: config.WEBHOOKS_PORT,
+		  path: config.WEBHOOKS_PATH.replace(/{cert_subject}/g, cert.subject),
+		  method: config.WEBHOOKS_METHOD
 	}, function(res) {
 		// TODO: Handle retry on failure
 		console.log('Webhook Status: ' + res.statusCode);
@@ -199,5 +230,8 @@ http.createServer(function(req, resp) {
 		resp.end('{ "error": { "message": "Not found" } }');
 	}
 }).listen(80);
-console.log("Starting docker service polling");
-pollDockerServices();
+
+if (!config.DISABLE_DOCKER_SERVICE_POLLING) {
+	console.log("Starting docker service polling");
+	pollDockerServices();
+}
