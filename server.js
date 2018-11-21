@@ -135,7 +135,7 @@ function pollDockerServices() {
 				}
 			});
 			removedDomains.forEach(function(removedDomain) {
-				console.log("Removing certificate from managed list "+domainsLabel);
+				console.log("Removing certificate from managed list "+removedDomain);
 				certificatesQueue.remove(domainsCache[removedDomain]);
 				delete domainsCache[removedDomain];
 			});
@@ -147,24 +147,25 @@ function pollDockerServices() {
 	setTimeout(pollDockerServices, config.DOCKER_POLLING_INTERVAL);
 }
 
-const certificatesQueue = async.queue(function(task, callback) {
-	getCertificate(task.domains, task.email, function(err, cert) {
-		if (err) {
-			task.retryCount = (task.retryCount || 0) + 1;
-			if (task.retryCount > config.MAX_RETRY) {
-				return console.error("Max retries reached for domains "+task.domains.join(","));
+const certificatesQueue = async.queue(async.timeout(function(task, callback) {
+		getCertificate(task.domains, task.email, function(err, cert) {
+			if (err) {
+				task.retryCount = (task.retryCount || 0) + 1;
+				if (task.retryCount > config.MAX_RETRY) {
+					return console.error("Max retries reached for domains "+task.domains.join(","));
+				}
+				setTimeout(function() {
+					certificatesQueue.push(task);
+				}, task.retryCount * config.RETRY_INTERVAL);
+			} else {
+				if (config.WEBHOOKS_HOST) {
+					webhooksQueue.push(cert);
+				}
 			}
-			setTimeout(function() {
-				certificatesQueue.push(task);
-			}, task.retryCount * config.RETRY_INTERVAL);
-		} else {
-			if (config.WEBHOOKS_HOST) {
-				webhooksQueue.push(cert);
-			}
-		}
-		callback();
-	});
-}, 1);
+			callback();
+		});
+	
+}, 30000), 1);
 
 const webhooksQueue = async.queue(function(cert, callback) {
 	var req = http.request({
