@@ -24,7 +24,7 @@ const config = {
 	WEBHOOKS_PATH: process.env.WEBHOOKS_PATH || "/",
 	WEBHOOKS_METHOD: process.env.WEBHOOKS_METHOD || "POST",
 	RSA_KEY_SIZE: Number(process.env.RSA_KEY_SIZE || 4096),
-	RENEW_DAYS_BEFORE_EXPIRE: Number(process.env.RSA_KEY_SIZE || 20),
+	RENEW_DAYS_BEFORE_EXPIRE: Number(process.env.RENEW_DAYS_BEFORE_EXPIRE || 20),
 	RENEW_CHECK_INTERVAL: Number(process.env.RENEW_CHECK_INTERVAL || 24 * 3600 * 1000)
 };
 
@@ -45,6 +45,8 @@ var greenlockStaging = Greenlock.create({
 			debug: false
 		})
 	},
+	renewWithin: (config.RENEW_DAYS_BEFORE_EXPIRE - 1) * 24 * 60 * 60 * 1000,
+	renewBy: config.RENEW_DAYS_BEFORE_EXPIRE * 24 * 60 * 60 * 1000,
 	debug: false
 });
 
@@ -61,6 +63,8 @@ var greenlockProduction = Greenlock.create({
 			debug: false
 		})
 	},
+	renewWithin: (config.RENEW_DAYS_BEFORE_EXPIRE - 1) * 24 * 60 * 60 * 1000,
+	renewBy: config.RENEW_DAYS_BEFORE_EXPIRE * 24 * 60 * 60 * 1000,
 	debug: false
 });
 
