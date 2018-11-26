@@ -112,7 +112,7 @@ function getCertificate(domains, email, callback) {
 
 function pollDockerServices() {
 	try {
-		console.log("Polling docker labels ...");
+		if (config.DEBUG) console.log("Polling docker labels ...");
 		docker.listServices({"filters": {"label": [config.DOCKER_LABEL_HOST]}}, function (err, services) {
 			if (err || !services) {
 				console.error("Failed to get Docker service list", err);
