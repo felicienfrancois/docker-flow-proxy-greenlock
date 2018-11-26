@@ -18,7 +18,6 @@ const config = {
 	RETRY_INTERVAL: Number(process.env.RETRY_INTERVAL || 60000),
 	MAX_RETRY: Number(process.env.MAX_RETRY || 10),
 	DISABLE_DOCKER_SERVICE_POLLING: !!process.env.DISABLE_DOCKER_SERVICE_POLLING,
-	DOCKER_POLLING_INTERVAL: Number(process.env.DOCKER_POLLING_INTERVAL || 60000),
 	DOCKER_LABEL_HOST: process.env.DOCKER_LABEL_HOST || "docker.greenlock.host",
 	DOCKER_LABEL_EMAIL: process.env.DOCKER_LABEL_EMAIL || "docker.greenlock.email",
 	WEBHOOKS_HOST: process.env.WEBHOOKS_HOST,
@@ -153,31 +152,24 @@ function pollDockerServices() {
 	} catch(err) {
 		console.error("[Docker] An unexpected error occured", err);
 	}
-	// Poll every 60s
-	setTimeout(pollDockerServices, config.DOCKER_POLLING_INTERVAL);
 }
 
-if (config.DEBUG) {
+if (!config.DISABLE_DOCKER_SERVICE_POLLING) {
+	if (config.DEBUG) console.log("[Debug] Starting docker service polling");
+	pollDockerServices();
 	console.log("[Docker] starting docker listener");
 	dockerListener.on("create", function(message) {
-		console.log("[Docker] container created: %j", message);
-	});
-	dockerListener.on("start", function(message) {
-		console.log("[Docker] container started: %j", message);
-	});
-	dockerListener.on("stop", function(message) {
-		console.log("[Docker] container stopped: %j", message);
-	});
-	dockerListener.on("die", function(message) {
-		console.log("[Docker] container died: %j", message);
+		if (config.DEBUG) console.log("[Docker] container created: %j", message);
+		pollDockerServices();
 	});
 	dockerListener.on("destroy", function(message) {
-		console.log("[Docker] container died: %j", message);
+		if (config.DEBUG) console.log("[Docker] container died: %j", message);
+		pollDockerServices();
 	});
 	dockerListener.start();
 }
 
-function pollCheckExpiryDate() {
+function checkExpiryDate() {
 	async.eachOf(domainsCache, function(domain, domainLabel, callback) {
 		if (config.DEBUG) console.log("[Renewal] Checking certificate for domains "+domainLabel+" ...");
 		greenlockProduction.check(domain).then(function (results) {
@@ -198,7 +190,7 @@ function pollCheckExpiryDate() {
 	}, function(err) {
 		if (err) console.error("[Renewal] ERROR", err);
 	});
-	setTimeout(pollCheckExpiryDate, config.RENEW_CHECK_INTERVAL);
+	setTimeout(checkExpiryDate, config.RENEW_CHECK_INTERVAL);
 }
 
 const certificatesQueue = async.queue(async.timeout(function(task, callback) {
@@ -286,12 +278,7 @@ http.createServer(function(req, resp) {
 	}
 }).listen(80);
 
-if (!config.DISABLE_DOCKER_SERVICE_POLLING) {
-	if (config.DEBUG) console.log("[Debug] Starting docker service polling");
-	pollDockerServices();
-}
-
 if (config.RENEW_CHECK_INTERVAL) {
 	if (config.DEBUG) console.log("[Debug] Starting renewal service");
-	setTimeout(pollCheckExpiryDate, config.RENEW_CHECK_INTERVAL);
+	setTimeout(checkExpiryDate, config.RENEW_CHECK_INTERVAL);
 }
