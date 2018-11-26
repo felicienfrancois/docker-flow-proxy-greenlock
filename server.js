@@ -4,9 +4,11 @@ const async = require('async');
 const http = require('http');
 const path = require('path');
 const Docker = require('dockerode');
+const DockerEvents = require('docker-events');
 const Greenlock = require('greenlock');
 const LeStoreCertbot = require('le-store-certbot');
 const LeChallengeStandalone = require('le-challenge-standalone');
+
 
 const config = {
 	DEBUG: !!process.env.DEBUG,
@@ -29,6 +31,7 @@ const config = {
 };
 
 const docker = new Docker();
+const dockerListener = new DockerEvents({ docker: docker });
 
 const domainsCache = {};
 
@@ -152,6 +155,16 @@ function pollDockerServices() {
 	}
 	// Poll every 60s
 	setTimeout(pollDockerServices, config.DOCKER_POLLING_INTERVAL);
+}
+
+if (config.DEBUG) {
+	dockerListener.on("create", function(message) {
+	console.log("container created: %j", message);
+	});
+
+	dockerListener.on("start", function(message) {
+	console.log("container started: %j", message);
+	});
 }
 
 function pollCheckExpiryDate() {
