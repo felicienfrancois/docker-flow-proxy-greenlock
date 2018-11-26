@@ -3,7 +3,6 @@
   "main": "server.js",
   "dependencies": {
     "async": "^2.6.1",
-    "docker-events": "0.0.2",
     "dockerode": "^2.5.6",
     "greenlock": "^2.4.2",
     "le-challenge-standalone": "^2.1.0",

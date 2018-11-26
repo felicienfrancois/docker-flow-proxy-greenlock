@@ -4,11 +4,9 @@ const async = require('async');
 const http = require('http');
 const path = require('path');
 const Docker = require('dockerode');
-const DockerEvents = require('docker-events');
 const Greenlock = require('greenlock');
 const LeStoreCertbot = require('le-store-certbot');
 const LeChallengeStandalone = require('le-challenge-standalone');
-
 
 const config = {
 	DEBUG: !!process.env.DEBUG,
@@ -17,7 +15,8 @@ const config = {
 	DISABLE_STAGING_PRECONTROL: !!process.env.DISABLE_STAGING_PRECONTROL,
 	RETRY_INTERVAL: Number(process.env.RETRY_INTERVAL || 60000),
 	MAX_RETRY: Number(process.env.MAX_RETRY || 10),
-	LISTEN_DOCKER_EVENTS: (process.env.LISTEN_DOCKER_EVENTS || "create,update,remove").trim().split(/ *, */),
+	DISABLE_DOCKER_SERVICE_POLLING: !!process.env.DISABLE_DOCKER_SERVICE_POLLING,
+	DOCKER_POLLING_INTERVAL: Number(process.env.DOCKER_POLLING_INTERVAL || 60000),
 	DOCKER_LABEL_HOST: process.env.DOCKER_LABEL_HOST || "docker.greenlock.host",
 	DOCKER_LABEL_EMAIL: process.env.DOCKER_LABEL_EMAIL || "docker.greenlock.email",
 	WEBHOOKS_HOST: process.env.WEBHOOKS_HOST,
@@ -152,20 +151,8 @@ function pollDockerServices() {
 	} catch(err) {
 		console.error("[Docker] An unexpected error occured", err);
 	}
-}
-
-if (config.LISTEN_DOCKER_EVENTS && config.LISTEN_DOCKER_EVENTS.length) {
-	if (config.DEBUG) console.log("[Debug] Starting docker service polling");
-	pollDockerServices();
-	console.log("[Docker] starting docker listener");
-	const dockerListener = new DockerEvents({ docker: docker });
-	config.LISTEN_DOCKER_EVENTS.forEach(function(event) {
-		dockerListener.on(event, function(message) {
-			if (config.DEBUG) console.log("[Docker] EVENT "+event+": %j", message);
-			pollDockerServices();
-		});
-	});
-	dockerListener.start();
+	// Poll every 60s
+	setTimeout(pollDockerServices, config.DOCKER_POLLING_INTERVAL);
 }
 
 function checkExpiryDate() {
@@ -276,6 +263,11 @@ http.createServer(function(req, resp) {
 		resp.end('{ "error": { "message": "Not found" } }');
 	}
 }).listen(80);
+
+if (!config.DISABLE_DOCKER_SERVICE_POLLING) {
+	console.log("Starting docker service polling");
+	pollDockerServices();
+}
 
 if (config.RENEW_CHECK_INTERVAL) {
 	if (config.DEBUG) console.log("[Debug] Starting renewal service");
