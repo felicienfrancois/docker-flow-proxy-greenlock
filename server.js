@@ -69,7 +69,7 @@ var greenlockProduction = Greenlock.create({
 
 function stagingPrecontrol(domains, email, callback) {
 	if (config.DISABLE_STAGING_PRECONTROL) return callback();
-	console.log("Trying to acquire staging certificate for domains "+domains.join(",")+" ...");
+	if (config.DEBUG) console.log("[Staging] Trying "+domains.join(",")+" ...");
 	greenlockStaging.register({
 		domains: domains,
 		email: email,
@@ -78,7 +78,7 @@ function stagingPrecontrol(domains, email, callback) {
 	}).then(function(certs) {
 		callback();
 	}, function (err) {
-		console.error("Failed to get staging certificate for domains "+domains.join(",")+" ...", err, err && err.stack);
+		console.error("[Staging] FAILED "+domains.join(","), err);
 		callback(err);
 	});
 }
@@ -87,45 +87,45 @@ function getCertificate(domains, email, callback) {
 	if (!domains || typeof(domains.length) === "undefined") {
 		return callback("Invalid domains "+domains);
 	}
-	console.log("Checking certificate for domains "+domains.join(",")+" ...");
+	if (config.DEBUG) console.log("[Cache] Checking "+domains.join(",")+" ...");
 	greenlockProduction.check({ domains: domains }).then(function (results) {
 		if (results) {
-			console.log("Found certificate in storage for domains "+domains.join(",")+" (expires "+new Date(results.expiresAt)+")");
 			let certificateWillExpireIn = (results.expiresAt - new Date().getTime()) / 24*60*60*1000;
 			if (certificateWillExpireIn < config.RENEW_DAYS_BEFORE_EXPIRE) {
-				console.log("Certificate for domains "+domains.join(",")+" will expire in "+certificateWillExpireIn+" days. Renewing ...");
+				console.log("[Cache] EXPIRE SOON "+domains.join(",")+" (expires "+new Date(results.expiresAt)+")");
 			} else {
+				console.log("[Cache] FOUND "+domains.join(",")+" (expires "+new Date(results.expiresAt)+")");
 				return callback(null, results);
 			}
 		}
 		stagingPrecontrol(domains, email, function(err) {
 			if (err) return callback(err);
-			console.log("Trying to acquire production certificate for domains "+domains.join(",")+" ...");
+			if (config.DEBUG) console.log("[Production] Trying "+domains.join(","));
 			greenlockProduction.register({
 				domains: domains,
 				email: email,
 				agreeTos: true,
 				rsaKeySize: config.RSA_KEY_SIZE
 			}).then(function(certs) {
-				console.log("Successfully got certificate for domains "+domains.join(",")+" ...");
+				console.log("[Production] SUCCESS "+domains.join(","));
 				callback(null, certs);
 			}, function (err) {
-				console.error("Failed to get production certificate for domains "+domains.join(",")+" ...", err, err && err.stack);
+				console.error("[Production] FAILED "+domains.join(","), err);
 				callback(err);
 			});
 		});
 	}, function (err) {
-		console.error("Failed to check certificate for domains "+domains.join(",")+" ...", err, err && err.stack);
+		console.error("[Cache] ERROR "+domains.join(","), err);
 		callback(err);
 	});
 }
 
 function pollDockerServices() {
 	try {
-		if (config.DEBUG) console.log("Polling docker labels ...");
+		if (config.DEBUG) console.log("[Docker] Polling docker labels ...");
 		docker.listServices({"filters": {"label": [config.DOCKER_LABEL_HOST]}}, function (err, services) {
 			if (err || !services) {
-				console.error("Failed to get Docker service list", err);
+				console.error("[Docker] FAILED to get Docker service list", err);
 				return;
 			}
 			var removedDomains = Object.keys(domainsCache).slice(0);
@@ -133,7 +133,7 @@ function pollDockerServices() {
 				var domainsLabel = service["Spec"]["Labels"][config.DOCKER_LABEL_HOST];
 				if (!domainsLabel) return;
 				if (!domainsCache[domainsLabel]) {
-					console.log("Adding new certificate to queue "+domainsLabel);
+					if (config.DEBUG) console.log("[Docker] Adding new certificate to queue "+domainsLabel);
 					var domain = {
 						domains: domainsLabel.split(/[,;]/),
 						email: service["Spec"]["Labels"][config.DOCKER_LABEL_EMAIL]
@@ -145,48 +145,49 @@ function pollDockerServices() {
 				}
 			});
 			removedDomains.forEach(function(removedDomain) {
-				console.log("Removing certificate from managed list "+removedDomain);
+				if (config.DEBUG) console.log("[Docker] Removing certificate from managed list "+removedDomain);
 				certificatesQueue.remove(domainsCache[removedDomain]);
 				delete domainsCache[removedDomain];
 			});
 		});
 	} catch(err) {
-		console.error("An unexpected error occured", err);
+		console.error("[Docker] An unexpected error occured", err);
 	}
 	// Poll every 60s
 	setTimeout(pollDockerServices, config.DOCKER_POLLING_INTERVAL);
 }
 
 if (config.DEBUG) {
+	console.log("[Docker] starting docker listener");
 	dockerListener.on("create", function(message) {
-	console.log("container created: %j", message);
+		console.log("[Docker] container created: %j", message);
 	});
 
 	dockerListener.on("start", function(message) {
-	console.log("container started: %j", message);
+		console.log("[Docker] container started: %j", message);
 	});
 }
 
 function pollCheckExpiryDate() {
 	async.eachOf(domainsCache, function(domain, domainLabel, callback) {
-		console.log("Checking certificate for domains "+domainLabel+" ...");
+		if (config.DEBUG) console.log("[Renewal] Checking certificate for domains "+domainLabel+" ...");
 		greenlockProduction.check(domain).then(function (results) {
 			if (results) {
-				console.log("Found certificate in storage for domains "+domainLabel+" (expires "+new Date(results.expiresAt)+")");
 				let certificateWillExpireIn = (results.expiresAt - new Date().getTime()) / 24*60*60*1000;
 				if (certificateWillExpireIn >= config.RENEW_DAYS_BEFORE_EXPIRE) {
+					console.log("[Renewal] OK "+domainLabel+" (expires "+new Date(results.expiresAt)+")");
 					return callback();
 				}
-				console.log("Certificate for domains "+domainLabel+" will expire in "+certificateWillExpireIn+" days. Renewing ...");
+				console.log("[Renewal] EXPIRES SOON "+domainLabel+" (expires "+new Date(results.expiresAt)+")");
 				certificatesQueue.push(domain);
 			}
 			return callback();
 		}, function (err) {
-			console.error("Failed to check certificate for domains "+domainLabel+" ...", err, err && err.stack);
+			console.error("[Renewal] ERROR "+domainLabel+" ...", err);
 			callback(err);
 		});
 	}, function(err) {
-		if (err) console.error("An error occured duringexpiry date check", err);
+		if (err) console.error("[Renewal] ERROR", err);
 	});
 	setTimeout(pollCheckExpiryDate, config.RENEW_CHECK_INTERVAL);
 }
@@ -196,7 +197,7 @@ const certificatesQueue = async.queue(async.timeout(function(task, callback) {
 			if (err) {
 				task.retryCount = (task.retryCount || 0) + 1;
 				if (task.retryCount > config.MAX_RETRY) {
-					return console.error("Max retries reached for domains "+task.domains.join(","));
+					return console.error("[Queue] FAILED Max retries reached "+task.domains.join(","));
 				}
 				setTimeout(function() {
 					certificatesQueue.push(task);
@@ -219,10 +220,10 @@ const webhooksQueue = async.queue(function(cert, callback) {
 		  method: config.WEBHOOKS_METHOD
 	}, function(res) {
 		// TODO: Handle retry on failure
-		console.log('Webhook Status: ' + res.statusCode);
+		console.log('[Outbound Webhook] Status: ' + res.statusCode);
 		res.setEncoding('utf8');
 		res.on('data', function (chunk) {
-			console.log('Webhook response: ' + chunk);
+			if (config.DEBUG) console.log('[Outbound Webhook] Response: ' + chunk);
 		});
 		callback();
 	});
@@ -232,39 +233,39 @@ const webhooksQueue = async.queue(function(cert, callback) {
 	req.end();
 }, 1);
 
-console.log("Starting letsencrypt server on port 80");
+if (config.DEBUG) console.log("[Debug] Starting letsencrypt server on port 80");
 
 var prefix = '/.well-known/acme-challenge/';
 
 http.createServer(function(req, resp) {
-	console.log("[Server] "+req.method + " " + req.url);
+	if (config.DEBUG) console.log("[Server] "+req.method + " " + req.url);
 	if (req.url.indexOf(prefix) === 0) {
 		var token = req.url.slice(prefix.length);
 		var hostname = req.hostname || (req.headers.host || '').toLowerCase().replace(/:.*/, '');
 		greenlockStaging.challenges['http-01'].get(Object.assign({domains: [hostname]}, greenlockStaging), hostname, token, function (err, secret) {
 	        if (err) {
-	        	console.error("Error while looking for staging secret", err);
+	        	console.error("[Http] ERROR while looking for staging secret", err);
 				resp.statusCode = 404;
 				resp.setHeader('Content-Type', 'application/json; charset=utf-8');
 				resp.end('{ "error": { "message": "Error: These aren\'t the tokens you\'re looking for. Move along." } }');
 				return;
 	        }
 	        if (secret) {
-	        	console.log("Found staging secret for "+hostname);
+	        	if (config.DEBUG) console.log("[Http] FOUND staging "+hostname);
 				resp.setHeader('Content-Type', 'text/plain; charset=utf-8');
 				resp.end(secret);
 				return;
 	        }
         	greenlockProduction.challenges['http-01'].get(Object.assign({domains: [hostname]}, greenlockProduction), hostname, token, function (err, secret) {
     	        if (err || !secret) {
-    	        	if (err) console.error("Error while looking for production secret", err);
-    	        	else console.error("Secret not found for hostname " + hostname);
+    	        	if (err) console.error("[Http] ERROR while looking for production secret", err);
+    	        	else console.error("[Http] NOT FOUND " + hostname);
     				resp.statusCode = 404;
     				resp.setHeader('Content-Type', 'application/json; charset=utf-8');
     				resp.end('{ "error": { "message": "Error: These aren\'t the tokens you\'re looking for. Move along." } }');
     				return;
     	        }
-	        	console.log("Found production secret for "+hostname);
+	        	if (config.DEBUG) console.log("[Http] FOUND production "+hostname);
     			resp.setHeader('Content-Type', 'text/plain; charset=utf-8');
     			resp.end(secret);
     		});
@@ -277,10 +278,11 @@ http.createServer(function(req, resp) {
 }).listen(80);
 
 if (!config.DISABLE_DOCKER_SERVICE_POLLING) {
-	console.log("Starting docker service polling");
+	if (config.DEBUG) console.log("[Debug] Starting docker service polling");
 	pollDockerServices();
 }
 
 if (config.RENEW_CHECK_INTERVAL) {
+	if (config.DEBUG) console.log("[Debug] Starting renewal service");
 	setTimeout(pollCheckExpiryDate, config.RENEW_CHECK_INTERVAL);
 }
