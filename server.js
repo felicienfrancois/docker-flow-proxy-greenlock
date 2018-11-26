@@ -162,10 +162,22 @@ if (config.DEBUG) {
 	dockerListener.on("create", function(message) {
 		console.log("[Docker] container created: %j", message);
 	});
-
 	dockerListener.on("start", function(message) {
 		console.log("[Docker] container started: %j", message);
 	});
+	dockerListener.on("_message", function(message) {
+		console.log("[Docker] got a message from docker: %j", message);
+	});
+	dockerListener.on("stop", function(message) {
+		console.log("[Docker] container stopped: %j", message);
+	});
+	dockerListener.on("die", function(message) {
+		console.log("[Docker] container died: %j", message);
+	});
+	dockerListener.on("destroy", function(message) {
+		console.log("[Docker] container died: %j", message);
+	});
+	dockerListener.start();
 }
 
 function pollCheckExpiryDate() {
