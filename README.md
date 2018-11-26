@@ -3,11 +3,14 @@
 Configurable docker image to generate letsencrypt certificates with [Greenlock](https://git.coolaj86.com/coolaj86/greenlock.js)
 Designed to work with [Docker-flow-proxy](https://proxy.dockerflow.com/)
 
+*NOT YET SUITABLE FOR PRODUCTION*
+
 Features:
 - Http challenge
 - Trigger certificate request though docker labels
 - Always try on staging letsencrypt before trying on production
 - Transmit certificate through webhooks after generation
+- Automated renewal
 
 Configuration environment variables:
 - `DEBUG`
