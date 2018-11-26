@@ -23,7 +23,8 @@ const config = {
 	WEBHOOKS_PORT: Number(process.env.WEBHOOKS_PORT || 80),
 	WEBHOOKS_PATH: process.env.WEBHOOKS_PATH || "/",
 	WEBHOOKS_METHOD: process.env.WEBHOOKS_METHOD || "POST",
-	RSA_KEY_SIZE: Number(process.env.RSA_KEY_SIZE || 4096)
+	RSA_KEY_SIZE: Number(process.env.RSA_KEY_SIZE || 4096),
+	RENEW_DAYS_BEFORE_EXPIRE: Number(process.env.RSA_KEY_SIZE || 20)
 };
 
 const docker = new Docker();
@@ -85,8 +86,13 @@ function getCertificate(domains, email, callback) {
 	console.log("Checking certificate for domains "+domains.join(",")+" ...");
 	greenlockProduction.check({ domains: domains }).then(function (results) {
 		if (results) {
-			console.log("Found certificate in storage for domains "+domains.join(",")+" ...");
-		    return callback(null, results);
+			console.log("Found certificate in storage for domains "+domains.join(",")+" (expires "+new Date(results.expiresAt)+")");
+			let certificateWillExpireIn = (results.expiresAt - new Date().getTime()) / 24*60*60*1000;
+			if (certificateWillExpireIn < config.RENEW_DAYS_BEFORE_EXPIRE) {
+				console.log("Certificate for domains "+domains.join(",")+" will expire in "+certificateWillExpireIn+" days. Renewing ...");
+			} else {
+				return callback(null, results);
+			}
 		}
 		stagingPrecontrol(domains, email, function(err) {
 			if (err) return callback(err);
