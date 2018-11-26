@@ -75,6 +75,7 @@ function stagingPrecontrol(domains, email, callback) {
 		agreeTos: true,
 		rsaKeySize: config.RSA_KEY_SIZE
 	}).then(function(certs) {
+		if (config.DEBUG) console.log("[Staging] SUCCESS "+domains.join(",")+" ...");
 		callback();
 	}, function (err) {
 		console.error("[Staging] FAILED "+domains.join(","), err);
@@ -221,10 +222,10 @@ const webhooksQueue = async.queue(function(cert, callback) {
 		  method: config.WEBHOOKS_METHOD
 	}, function(res) {
 		// TODO: Handle retry on failure
-		console.log('[Outbound Webhook] Status: ' + res.statusCode);
+		console.log('[Outbound Webhook] '+cert.subject+' Status: ' + res.statusCode);
 		res.setEncoding('utf8');
 		res.on('data', function (chunk) {
-			if (config.DEBUG) console.log('[Outbound Webhook] Response: ' + chunk);
+			if (config.DEBUG) console.log('[Outbound Webhook] '+cert.subject+' Response: ' + chunk);
 		});
 		callback();
 	});
