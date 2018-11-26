@@ -24,7 +24,8 @@ const config = {
 	WEBHOOKS_PATH: process.env.WEBHOOKS_PATH || "/",
 	WEBHOOKS_METHOD: process.env.WEBHOOKS_METHOD || "POST",
 	RSA_KEY_SIZE: Number(process.env.RSA_KEY_SIZE || 4096),
-	RENEW_DAYS_BEFORE_EXPIRE: Number(process.env.RSA_KEY_SIZE || 20)
+	RENEW_DAYS_BEFORE_EXPIRE: Number(process.env.RSA_KEY_SIZE || 20),
+	RENEW_CHECK_INTERVAL: Number(process.env.RENEW_CHECK_INTERVAL || 24 * 3600 * 1000)
 };
 
 const docker = new Docker();
@@ -153,6 +154,30 @@ function pollDockerServices() {
 	setTimeout(pollDockerServices, config.DOCKER_POLLING_INTERVAL);
 }
 
+function pollCheckExpiryDate() {
+	async.eachOf(domainsCache, function(domain, domainLabel, callback) {
+		console.log("Checking certificate for domains "+domainLabel+" ...");
+		greenlockProduction.check(domain).then(function (results) {
+			if (results) {
+				console.log("Found certificate in storage for domains "+domainLabel+" (expires "+new Date(results.expiresAt)+")");
+				let certificateWillExpireIn = (results.expiresAt - new Date().getTime()) / 24*60*60*1000;
+				if (certificateWillExpireIn >= config.RENEW_DAYS_BEFORE_EXPIRE) {
+					return callback();
+				}
+				console.log("Certificate for domains "+domainLabel+" will expire in "+certificateWillExpireIn+" days. Renewing ...");
+				certificatesQueue.push(domain);
+			}
+			return callback();
+		}, function (err) {
+			console.error("Failed to check certificate for domains "+domainLabel+" ...", err, err && err.stack);
+			callback(err);
+		});
+	}, function(err) {
+		if (err) console.error("An error occured duringexpiry date check", err);
+	});
+	setTimeout(pollCheckExpiryDate, config.RENEW_CHECK_INTERVAL);
+}
+
 const certificatesQueue = async.queue(async.timeout(function(task, callback) {
 		getCertificate(task.domains, task.email, function(err, cert) {
 			if (err) {
@@ -241,4 +266,8 @@ http.createServer(function(req, resp) {
 if (!config.DISABLE_DOCKER_SERVICE_POLLING) {
 	console.log("Starting docker service polling");
 	pollDockerServices();
+}
+
+if (config.RENEW_CHECK_INTERVAL) {
+	setTimeout(pollCheckExpiryDate, config.RENEW_CHECK_INTERVAL);
 }
