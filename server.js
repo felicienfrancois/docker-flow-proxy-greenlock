@@ -17,7 +17,7 @@ const config = {
 	DISABLE_STAGING_PRECONTROL: !!process.env.DISABLE_STAGING_PRECONTROL,
 	RETRY_INTERVAL: Number(process.env.RETRY_INTERVAL || 60000),
 	MAX_RETRY: Number(process.env.MAX_RETRY || 10),
-	DISABLE_DOCKER_SERVICE_POLLING: !!process.env.DISABLE_DOCKER_SERVICE_POLLING,
+	LISTEN_DOCKER_EVENTS: (process.env.LISTEN_DOCKER_EVENTS || "create,update,remove").trim().split(/ *, */),
 	DOCKER_LABEL_HOST: process.env.DOCKER_LABEL_HOST || "docker.greenlock.host",
 	DOCKER_LABEL_EMAIL: process.env.DOCKER_LABEL_EMAIL || "docker.greenlock.email",
 	WEBHOOKS_HOST: process.env.WEBHOOKS_HOST,
@@ -30,7 +30,6 @@ const config = {
 };
 
 const docker = new Docker();
-const dockerListener = new DockerEvents({ docker: docker });
 
 const domainsCache = {};
 
@@ -155,17 +154,16 @@ function pollDockerServices() {
 	}
 }
 
-if (!config.DISABLE_DOCKER_SERVICE_POLLING) {
+if (config.LISTEN_DOCKER_EVENTS && config.LISTEN_DOCKER_EVENTS.length) {
 	if (config.DEBUG) console.log("[Debug] Starting docker service polling");
 	pollDockerServices();
 	console.log("[Docker] starting docker listener");
-	dockerListener.on("create", function(message) {
-		if (config.DEBUG) console.log("[Docker] container created: %j", message);
-		pollDockerServices();
-	});
-	dockerListener.on("destroy", function(message) {
-		if (config.DEBUG) console.log("[Docker] container died: %j", message);
-		pollDockerServices();
+	const dockerListener = new DockerEvents({ docker: docker });
+	config.LISTEN_DOCKER_EVENTS.forEach(function(event) {
+		dockerListener.on(event, function(message) {
+			if (config.DEBUG) console.log("[Docker] EVENT "+event+": %j", message);
+			pollDockerServices();
+		});
 	});
 	dockerListener.start();
 }
