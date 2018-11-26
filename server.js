@@ -90,7 +90,7 @@ function getCertificate(domains, email, callback) {
 	if (config.DEBUG) console.log("[Cache] Checking "+domains.join(",")+" ...");
 	greenlockProduction.check({ domains: domains }).then(function (results) {
 		if (results) {
-			let certificateWillExpireIn = (results.expiresAt - new Date().getTime()) / 24*60*60*1000;
+			let certificateWillExpireIn = (results.expiresAt - new Date().getTime()) / (24*60*60*1000);
 			if (certificateWillExpireIn < config.RENEW_DAYS_BEFORE_EXPIRE) {
 				console.log("[Cache] EXPIRE SOON "+domains.join(",")+" (expires "+new Date(results.expiresAt)+")");
 			} else {
@@ -173,7 +173,7 @@ function pollCheckExpiryDate() {
 		if (config.DEBUG) console.log("[Renewal] Checking certificate for domains "+domainLabel+" ...");
 		greenlockProduction.check(domain).then(function (results) {
 			if (results) {
-				let certificateWillExpireIn = (results.expiresAt - new Date().getTime()) / 24*60*60*1000;
+				let certificateWillExpireIn = (results.expiresAt - new Date().getTime()) / (24*60*60*1000);
 				if (certificateWillExpireIn >= config.RENEW_DAYS_BEFORE_EXPIRE) {
 					console.log("[Renewal] OK "+domainLabel+" (expires "+new Date(results.expiresAt)+")");
 					return callback();
