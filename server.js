@@ -92,8 +92,12 @@ function getCertificate(domains, email, callback) {
 	if (config.DEBUG) console.log("[Cache] Checking "+domains.join(",")+" ...");
 	greenlockProduction.check({ domains: domains }).then(function (results) {
 		if (results) {
-			console.log("[Cache] FOUND "+domains.join(",")+" (expires "+new Date(results.expiresAt)+")");
-			return callback(null, results);
+			let certificateWillExpireIn = (results.expiresAt - new Date().getTime()) / (24*60*60*1000);
+			if (certificateWillExpireIn >= config.RENEW_DAYS_BEFORE_EXPIRE) {
+				console.log("[Cache] FOUND "+domains.join(",")+" (expires "+new Date(results.expiresAt)+")");
+				return callback(null, results);
+			}
+			console.log("[Renewal] RENEWING "+domains.join(",")+" (expires "+new Date(results.expiresAt)+")");
 		}
 		stagingPrecontrol(domains, email, function(err) {
 			if (err) return callback(err);
