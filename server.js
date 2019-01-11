@@ -69,7 +69,7 @@ var greenlockProduction = Greenlock.create({
 	renewWithin: (config.RENEW_DAYS_BEFORE_EXPIRE + 1) * 24 * 60 * 60 * 1000,
 	renewBy: config.RENEW_DAYS_BEFORE_EXPIRE * 24 * 60 * 60 * 1000,
 	debug: config.DEBUG,
-	log: function (debug) {
+	log: function () {
 		console.log.apply(console, ["[Production]"].concat(Array.from(arguments)));
 	}
 });
