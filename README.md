@@ -2,7 +2,7 @@
 
 Configurable docker image to generate letsencrypt certificates with [Greenlock](https://git.coolaj86.com/coolaj86/greenlock.js)
 
-Designed to work with [Docker-flow-proxy](https://proxy.dockerflow.com/) as a dropin replacement for for [n1b0r/docker-flow-proxy-letsencrypt](docker-flow-proxy-letsencrypt)
+Designed to work with [Docker-flow-proxy](https://proxy.dockerflow.com/) as a dropin replacement for for [https://github.com/n1b0r/docker-flow-proxy-letsencrypt](https://github.com/n1b0r/docker-flow-proxy-letsencrypt)
 
 Current status: *FUNCTIONAL BUT NOT YET TESTED ENOUGH TO BE SUITABLE FOR PRODUCTION*
 
@@ -36,7 +36,7 @@ Current status: *FUNCTIONAL BUT NOT YET TESTED ENOUGH TO BE SUITABLE FOR PRODUCT
 
 ### Example configurations
 
-#### Dropin remplacement for [n1b0r/docker-flow-proxy-letsencrypt](docker-flow-proxy-letsencrypt)
+#### Dropin remplacement for [n1b0r/docker-flow-proxy-letsencrypt](https://github.com/n1b0r/docker-flow-proxy-letsencrypt)
 
 greenlock.yml
 
