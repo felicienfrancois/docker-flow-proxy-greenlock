@@ -38,16 +38,16 @@ var greenlockStaging = Greenlock.create({
 	configDir:  path.resolve(config.STAGING_BASE_DIRECTORY, 'config'),
 	store: LeStoreCertbot.create({
 		configDir: path.resolve(config.STAGING_BASE_DIRECTORY, 'certs'),
-		debug: false
+		debug: config.DEBUG
 	}),
 	challenges: {
 		'http-01': LeChallengeStandalone.create({
-			debug: false
+			debug: config.DEBUG
 		})
 	},
 	renewWithin: (config.RENEW_DAYS_BEFORE_EXPIRE + 1) * 24 * 60 * 60 * 1000,
 	renewBy: config.RENEW_DAYS_BEFORE_EXPIRE * 24 * 60 * 60 * 1000,
-	debug: DEBUG,
+	debug: config.DEBUG,
 	log: function (debug) {
 		console.log.apply(console, ["[Staging]"].concat(arguments));
 	}
@@ -59,16 +59,16 @@ var greenlockProduction = Greenlock.create({
 	configDir: path.resolve(config.LIVE_BASE_DIRECTORY, 'config'),
 	store: LeStoreCertbot.create({
 		configDir: path.resolve(config.LIVE_BASE_DIRECTORY, 'certs'),
-		debug: false
+		debug: config.DEBUG
 	}),
 	challenges: {
 		'http-01': LeChallengeStandalone.create({
-			debug: false
+			debug: config.DEBUG
 		})
 	},
 	renewWithin: (config.RENEW_DAYS_BEFORE_EXPIRE + 1) * 24 * 60 * 60 * 1000,
 	renewBy: config.RENEW_DAYS_BEFORE_EXPIRE * 24 * 60 * 60 * 1000,
-	debug: DEBUG,
+	debug: config.DEBUG,
 	log: function (debug) {
 		console.log.apply(console, ["[Production]"].concat(arguments));
 	}
