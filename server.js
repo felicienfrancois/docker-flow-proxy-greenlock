@@ -106,19 +106,30 @@ function getCertificate(domains, email, callback) {
 		}
 		stagingPrecontrol(domains, email, function(err) {
 			if (err) return callback(err);
-			if (config.DEBUG) console.log("[Production] Trying "+domains.join(","));
-			greenlockProduction.register({
-				domains: domains,
-				email: email,
-				agreeTos: true,
-				rsaKeySize: config.RSA_KEY_SIZE
-			}).then(function(certs) {
-				console.log("[Production] SUCCESS "+domains.join(","));
-				callback(null, certs);
-			}, function (err) {
-				console.error("[Production] FAILED "+domains.join(","), err);
-				callback(err);
-			});
+			if (results) {
+				if (config.DEBUG) console.log("[Renewal] Trying "+domains.join(","));
+				greenlockProduction.renew(results).then(function(certs) {
+					console.log("[Renewal] SUCCESS "+domains.join(","));
+					callback(null, certs);
+				}, function (err) {
+					console.error("[Renewal] FAILED "+domains.join(","), err);
+					callback(err);
+				});
+			} else {
+				if (config.DEBUG) console.log("[Production] Trying "+domains.join(","));
+				greenlockProduction.register({
+					domains: domains,
+					email: email,
+					agreeTos: true,
+					rsaKeySize: config.RSA_KEY_SIZE
+				}).then(function(certs) {
+					console.log("[Production] SUCCESS "+domains.join(","));
+					callback(null, certs);
+				}, function (err) {
+					console.error("[Production] FAILED "+domains.join(","), err);
+					callback(err);
+				});
+			}
 		});
 	}, function (err) {
 		console.error("[Cache] ERROR "+domains.join(","), err);
