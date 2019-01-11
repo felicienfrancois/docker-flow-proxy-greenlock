@@ -24,7 +24,7 @@ const config = {
 	WEBHOOKS_PATH: process.env.WEBHOOKS_PATH || "/",
 	WEBHOOKS_METHOD: process.env.WEBHOOKS_METHOD || "POST",
 	RSA_KEY_SIZE: Number(process.env.RSA_KEY_SIZE || 4096),
-	RENEW_DAYS_BEFORE_EXPIRE: Number(process.env.RENEW_DAYS_BEFORE_EXPIRE || 20),
+	RENEW_DAYS_BEFORE_EXPIRE: Number(process.env.RENEW_DAYS_BEFORE_EXPIRE || 15),
 	RENEW_CHECK_INTERVAL: Number(process.env.RENEW_CHECK_INTERVAL || 24 * 3600 * 1000)
 };
 
@@ -45,9 +45,12 @@ var greenlockStaging = Greenlock.create({
 			debug: false
 		})
 	},
-	renewWithin: (config.RENEW_DAYS_BEFORE_EXPIRE - 1) * 24 * 60 * 60 * 1000,
+	renewWithin: (config.RENEW_DAYS_BEFORE_EXPIRE + 1) * 24 * 60 * 60 * 1000,
 	renewBy: config.RENEW_DAYS_BEFORE_EXPIRE * 24 * 60 * 60 * 1000,
-	debug: false
+	debug: DEBUG,
+	log: function (debug) {
+		console.log.apply(console, ["[Staging]"].concat(arguments));
+	}
 });
 
 var greenlockProduction = Greenlock.create({
@@ -63,9 +66,12 @@ var greenlockProduction = Greenlock.create({
 			debug: false
 		})
 	},
-	renewWithin: (config.RENEW_DAYS_BEFORE_EXPIRE - 1) * 24 * 60 * 60 * 1000,
+	renewWithin: (config.RENEW_DAYS_BEFORE_EXPIRE + 1) * 24 * 60 * 60 * 1000,
 	renewBy: config.RENEW_DAYS_BEFORE_EXPIRE * 24 * 60 * 60 * 1000,
-	debug: false
+	debug: DEBUG,
+	log: function (debug) {
+		console.log.apply(console, ["[Production]"].concat(arguments));
+	}
 });
 
 function stagingPrecontrol(domains, email, callback) {
@@ -92,12 +98,11 @@ function getCertificate(domains, email, callback) {
 	if (config.DEBUG) console.log("[Cache] Checking "+domains.join(",")+" ...");
 	greenlockProduction.check({ domains: domains }).then(function (results) {
 		if (results) {
+			console.log("[Cache] FOUND "+domains.join(",")+" (expires "+new Date(results.expiresAt)+")");
 			let certificateWillExpireIn = (results.expiresAt - new Date().getTime()) / (24*60*60*1000);
 			if (certificateWillExpireIn >= config.RENEW_DAYS_BEFORE_EXPIRE) {
-				console.log("[Cache] FOUND "+domains.join(",")+" (expires "+new Date(results.expiresAt)+")");
 				return callback(null, results);
 			}
-			console.log("[Renewal] RENEWING "+domains.join(",")+" (expires "+new Date(results.expiresAt)+")");
 		}
 		stagingPrecontrol(domains, email, function(err) {
 			if (err) return callback(err);
