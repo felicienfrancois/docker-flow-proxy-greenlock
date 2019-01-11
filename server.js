@@ -114,7 +114,11 @@ function getCertificate(domains, email, callback) {
 			if (err) return callback(err);
 			if (results) {
 				if (config.DEBUG) console.log("[Renewal] Trying "+domains.join(","));
-				greenlockProduction.renew({}, results).then(function(certs) {
+				greenlockProduction.renew({
+					email: email,
+					agreeTos: true,
+					rsaKeySize: config.RSA_KEY_SIZE
+				}, results).then(function(certs) {
 					console.log("[Renewal] SUCCESS "+domains.join(","));
 					callback(null, certs);
 				}, function (err) {
