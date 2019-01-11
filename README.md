@@ -10,7 +10,7 @@ Current status: *FUNCTIONAL BUT NOT YET TESTED ENOUGH TO BE SUITABLE FOR PRODUCT
 
 - Http challenge
 - Trigger certificate request though docker labels on services
-- ATry on staging letsencrypt servers before trying on production
+- Try on staging letsencrypt servers before trying on production
 - Transmit certificate through webhooks after generation
 - Automated renewal
 
