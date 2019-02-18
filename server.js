@@ -159,16 +159,18 @@ function pollDockerServices() {
 			services.forEach(function(service) {
 				var domainsLabel = service["Spec"]["Labels"][config.DOCKER_LABEL_HOST];
 				if (!domainsLabel) return;
-				if (!domainsCache[domainsLabel]) {
-					if (config.DEBUG) console.log("[Docker] Adding new certificate to queue "+domainsLabel);
-					var domain = {
-						domains: domainsLabel.split(/[,;]/),
-						email: service["Spec"]["Labels"][config.DOCKER_LABEL_EMAIL]
-					};
-					domainsCache[domainsLabel] = domain;
-					certificatesQueue.push(domain);
-				} else if (removedDomains.indexOf(domainsLabel) !== -1) {
-					removedDomains.splice(removedDomains.indexOf(domainsLabel), 1);
+				for (var domainLabel of domainsLabel.split(/[,;]/)) {
+					if (!domainsCache[domainLabel]) {
+						if (config.DEBUG) console.log("[Docker] Adding new certificate to queue "+domainLabel);
+						var domain = {
+							domains: [domainLabel],
+							email: service["Spec"]["Labels"][config.DOCKER_LABEL_EMAIL]
+						};
+						domainsCache[domainLabel] = domain;
+						certificatesQueue.push(domain);
+					} else if (removedDomains.indexOf(domainLabel) !== -1) {
+						removedDomains.splice(removedDomains.indexOf(domainLabel), 1);
+					}
 				}
 			});
 			removedDomains.forEach(function(removedDomain) {
