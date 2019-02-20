@@ -36,6 +36,7 @@ var greenlockStaging = Greenlock.create({
 	version: 'draft-12',
 	server: 'https://acme-staging-v02.api.letsencrypt.org/directory',
 	communityMember: false,
+	securityUpdates: false,
 	configDir:  path.resolve(config.STAGING_BASE_DIRECTORY, 'config'),
 	store: LeStoreCertbot.create({
 		configDir: path.resolve(config.STAGING_BASE_DIRECTORY, 'certs'),
@@ -61,6 +62,7 @@ var greenlockProduction = Greenlock.create({
 	version: 'draft-12',
 	server: 'https://acme-v02.api.letsencrypt.org/directory',
 	communityMember: false,
+	securityUpdates: false,
 	configDir: path.resolve(config.LIVE_BASE_DIRECTORY, 'config'),
 	store: LeStoreCertbot.create({
 		configDir: path.resolve(config.LIVE_BASE_DIRECTORY, 'certs'),
